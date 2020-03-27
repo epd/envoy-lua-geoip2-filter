@@ -15,10 +15,6 @@ end
 function envoy_on_request(request_handle)
     local xff = request_handle:headers():get('x-forwarded-for')
     local ip = string.gmatch(xff, "([^,]+)")()
-    print('***************')
-    print(xff)
-    print(ip)
-    print('***************')
     local country = M.get_country(ip)
 
     if country then
