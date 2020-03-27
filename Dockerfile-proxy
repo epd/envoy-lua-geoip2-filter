@@ -1,0 +1,31 @@
+FROM ubuntu:16.04 AS luabuild
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        curl \
+        libmaxminddb-dev \
+        pkg-config
+
+WORKDIR /build
+
+RUN curl -sLO https://luajit.org/download/LuaJIT-2.1.0-beta3.tar.gz && \
+    tar zxf LuaJIT-2.1.0-beta3.tar.gz && \
+    cd LuaJIT-2.1.0-beta3 && \
+    make && make install
+
+COPY lib/Makefile lib/maxminddb.c ./
+
+RUN make maxminddb.so && \
+    LD_LIBRARY_PATH=/usr/local/lib ldd maxminddb.so
+
+FROM envoyproxy/envoy-dev:latest
+
+COPY --from=luabuild /build/maxminddb.so                            /usr/local/lib/lua/5.1/
+COPY --from=luabuild /usr/lib/x86_64-linux-gnu/libmaxminddb.so.0    /lib/x86_64-linux-gnu/
+COPY --from=luabuild /usr/local/lib/libluajit-5.1.so.2              /lib/x86_64-linux-gnu/
+
+COPY ./lib/envoy_geoip2.lua /lib/
+
+CMD /usr/local/bin/envoy -c /etc/envoy.yaml -l debug --service-cluster proxy
